@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zdatabase"
+version = "0.2.3"
+authors = [
+  { name="inspirare6", email="inspirare6@163.com" },
+]
+description = "zen database library"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+  "flask_sqlalchemy==2.5.1",
+  "sqlalchemy==1.4.39",
+  "inspirare"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/inspirare6/zdatabase"
+"Bug Tracker" = "https://github.com/inspirare6/zdatabase/issues"
