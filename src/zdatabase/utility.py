@@ -171,6 +171,15 @@ class MapperUtility:
         return cls.jsonlize(items)
 
     @classmethod
+    def get_page(cls, **kwargs):
+        pagination = {
+            'page_size': kwargs.pop('page_size', 20),
+            'page_num': kwargs.pop('page_num', 1)
+        }
+        query = cls.make_query(**kwargs)
+        return cls.paginate(query, pagination)
+
+    @classmethod
     def get_all_(cls):
         return cls.filter().all()
 
@@ -184,6 +193,14 @@ class MapperUtility:
         flts = cls.make_flts(**kwargs)
         attrs = [getattr(cls, attr_name) for attr_name in attr_names]
         return cls.query_(*attrs).filter(*flts).all()
+
+    @classmethod
+    def get_map_(cls, attr_names):
+        rst_map = {}
+        for item in cls.get_attrs_(attr_names):
+            a, b = item
+            rst_map[a] = b
+        return rst_map
 
     @classmethod
     def delete_list_(cls, **kwargs):

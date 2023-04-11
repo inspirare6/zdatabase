@@ -10,8 +10,7 @@ class Database(SQLAlchemy):
             url = 'mysql+pymysql://{user}:{password}@{host}:{port}/{db}?charset=utf8mb4'.format(**config)
         return url
 
-    def init(self, config, db_type):
-        url = self.make_url(config, db_type)
+    def init(self, url):
         engine = create_engine(url)
         metadata = MetaData(bind=engine)
         return engine, metadata
