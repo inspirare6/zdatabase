@@ -1,23 +1,19 @@
-from zdatabase import session
+from zdatabase import db
 
 
 class DatabaseUtility:
     @staticmethod
     def flush():
-        session.flush()
+        db.session.flush()
 
     @staticmethod
     def commit():
-        session.commit()
-
-    @staticmethod
-    def query_(*args, **kwargs):
-        return session.query(*args, **kwargs)
+        db.session.commit()
 
     @staticmethod
     def add_all(items):
-        session.add_all(items)
-        session.commit()
+        db.session.add_all(items)
+        db.session.commit()
         return items
 
 
@@ -143,14 +139,16 @@ class MapperUtility:
         if obj:
             obj.update(data)
         else:
-            cls.add_(data)
+            obj = cls.add_(data)
         cls.commit()
+        return obj
 
     @classmethod
     def update_(cls, primary_key, data):
         obj = cls.get_(primary_key)
-        obj.update(data)
-        cls.commit()
+        if obj:
+            obj.update(data)
+            cls.commit()
 
     @classmethod
     def get_(cls, primary_key):
@@ -176,7 +174,7 @@ class MapperUtility:
             'page_size': kwargs.pop('page_size', 20),
             'page_num': kwargs.pop('page_num', 1)
         }
-        query = cls.make_query(**kwargs)
+        query = cls.make_query(**kwargs).order_by(cls.id.desc())
         return cls.paginate(query, pagination)
 
     @classmethod
@@ -192,7 +190,7 @@ class MapperUtility:
     def get_attrs_(cls, attr_names, **kwargs):
         flts = cls.make_flts(**kwargs)
         attrs = [getattr(cls, attr_name) for attr_name in attr_names]
-        return cls.query_(*attrs).filter(*flts).all()
+        return cls.query(*attrs).filter(*flts).all()
 
     @classmethod
     def get_map_(cls, attr_names):

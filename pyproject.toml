@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zdatabase"
-version = "0.2.8"
+version = "0.4.6"
 authors = [
   { name="inspirare6", email="inspirare6@163.com" },
 ]
@@ -12,7 +12,6 @@ description = "zen database library"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-  "flask_sqlalchemy==2.5.1",
   "sqlalchemy==1.4.39",
   "inspirare"
 ]

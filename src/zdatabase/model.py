@@ -1,14 +1,18 @@
-from zdatabase import db
+from zdatabase import Base, db
 from zdatabase.utility import DatabaseUtility, QueryUtility, MapperUtility
 from inspirare import time
 
 
-class Model(db.Model, DatabaseUtility, QueryUtility, MapperUtility):
+class Model(Base, DatabaseUtility, QueryUtility, MapperUtility):
     __abstract__ = True
+    
+    @staticmethod
+    def query(*args, **kwargs):
+        return db.session.query(*args, **kwargs)
 
     @classmethod
     def filter(cls, *args, **kwargs):
-        return cls.query.filter(*args, **kwargs)
+        return cls.query(cls).filter(*args, **kwargs)
 
     @classmethod
     def clean_params(cls, dict_):
