@@ -1,18 +1,15 @@
-from zdatabase import Base, db
+from zdatabase import db
 from zdatabase.utility import DatabaseUtility, QueryUtility, MapperUtility
 from inspirare import time
 
 
-class Model(Base, DatabaseUtility, QueryUtility, MapperUtility):
+class Model(db.Model, DatabaseUtility, QueryUtility, MapperUtility):
     __abstract__ = True
-    
-    @staticmethod
-    def query(*args, **kwargs):
-        return db.session.query(*args, **kwargs)
+    __schema__ = {}
 
     @classmethod
     def filter(cls, *args, **kwargs):
-        return cls.query(cls).filter(*args, **kwargs)
+        return cls.query.filter(*args, **kwargs)
 
     @classmethod
     def clean_params(cls, dict_):
@@ -22,32 +19,29 @@ class Model(Base, DatabaseUtility, QueryUtility, MapperUtility):
             if key not in cls.keys():  # 无关字段过滤
                 dict_.pop(key)
         return dict_
-    
+
     @classmethod
     def keys(cls):
         return cls.__table__.columns.keys()
-    
-    def get(self, key):
-        return self.__getattribute__(key)
 
     def raw_json(self):
-        return {key: self.get(key) for key in self.keys()}
-    
+        return {key: self.__getattribute__(key) for key in self.keys()}
+
     def to_json(self):
         return self.to_json_()
-    
+
     @property
     def key_map(self):
         return {}
-    
+
     @property
     def key_derive_map(self):
         return {}
-    
-    def to_json_(self): # 新方法，待替换
+
+    def to_json_(self):  # 新方法，待替换
         tmp = {}
         for k in self.keys():
-            v = self.get(k)
+            v = self.__getattribute__(k)
             tmp[k] = v
             for key, func in self.key_map.items():
                 if k == key:
@@ -64,19 +58,19 @@ class Model(Base, DatabaseUtility, QueryUtility, MapperUtility):
                         func = map['func']
                         tmp[name] = func(v)
         return tmp
-    
+
     @staticmethod
     def format_date(value):
         return time.format(value, 'YYYY-MM-DD') if value is not None else ''
-    
+
     @staticmethod
     def format_datetime(value):
         return time.format(value, 'YYYY-MM-DD HH:mm:ss') if value is not None else None
-    
+
     @classmethod
     def new(cls, dict_):
         return cls(**cls.clean_params(dict_))
-    
+
     def add_one(self):
         """添加到数据库缓存"""
         db.session.add(self)
@@ -94,5 +88,3 @@ class Model(Base, DatabaseUtility, QueryUtility, MapperUtility):
         """合并"""
         db.session.merge(self)
         return self
-
-  

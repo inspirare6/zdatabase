@@ -1,4 +1,5 @@
 from zdatabase import db
+from jsonschema import validate
 
 
 class DatabaseUtility:
@@ -9,6 +10,14 @@ class DatabaseUtility:
     @staticmethod
     def commit():
         db.session.commit()
+
+    @staticmethod
+    def rollback():
+        db.session.rollback()
+
+    @staticmethod
+    def query_(*args, **kwargs):
+        return db.session.query(*args, **kwargs)
 
     @staticmethod
     def add_all(items):
@@ -26,10 +35,9 @@ class QueryUtility:
         flts = []
         for cond in conds:
             value = params.get(cond)
-            if value:
-                flts.append(getattr(cls, cond).like(f'%{value}%'))
+            flts += [getattr(cls, cond).like(f'%{value}%')] if value else []
         return flts
-    
+
     @classmethod
     def select_(cls, params, conds):
         """ 筛选(精确匹配）
@@ -38,8 +46,7 @@ class QueryUtility:
         flts = []
         for cond in conds:
             value = params.get(cond)
-            if value:
-                flts.append(getattr(cls, cond) == value)
+            flts += [getattr(cls, cond) == value] if value else []
         return flts
 
     @classmethod
@@ -48,10 +55,8 @@ class QueryUtility:
         flts = []
         start_date = params.get('start_date')
         end_date = params.get('end_date')
-        if start_date:
-            flts.append(getattr(cls, attr_name) >= start_date)
-        if end_date:
-            flts.append(getattr(cls, attr_name) <= end_date)
+        flts += [getattr(cls, attr_name) >= start_date] if start_date else []
+        flts += [getattr(cls, attr_name) <= end_date] if end_date else []
         return flts
 
     @staticmethod
@@ -66,34 +71,13 @@ class QueryUtility:
         """分页
         page_size=100&page_num=1
         """
-        page_num = params.get('page_num')
-        page_size = params.get('page_size')
-        page_num = int(page_num) if page_num else 1
-        page_size = int(page_size) if page_size else 10
-        offset_num = (page_num - 1) * page_size
-        items = query.offset(offset_num).limit(page_size).all()
-        total = query.count()
+        page_num = int(params.get('page_num', '1'))
+        page_size = int(params.get('page_size', '10'))
+        pagination = query.paginate(page_num, per_page=page_size)
         rst = {
-            'items': [getattr(item, method)() for item in items],
-            'total': total
-        }
-        return rst
-
-    @staticmethod
-    def paginate2(cls, query, params, method):
-        """分页
-        page_size=100&page_num=1
-        """
-        page_num = params.get('page_num')
-        page_size = params.get('page_size')
-        page_num = int(page_num) if page_num else 1
-        page_size = int(page_size) if page_size else 10
-        offset_num = (page_num - 1) * page_size
-        rst = query.offset(offset_num).limit(page_size).all()
-        total = query.count()
-        rst = {
-            'items': [method(item) for item in rst],
-            'total': total
+            'items': [getattr(item, method)() for item in pagination.items],
+            'total': pagination.total,
+            'pages': pagination.pages
         }
         return rst
 
@@ -102,18 +86,6 @@ class MapperUtility:
     @staticmethod
     def jsonlize(items):
         return [item.to_json() for item in items]
-    
-    @classmethod
-    def make_flts(cls, **kwargs):
-        flts = []
-        for k, v in kwargs.items():
-            flts += [getattr(cls, k) == v]
-        return flts
-
-    @classmethod
-    def make_query(cls, **kwargs):
-        flts = cls.make_flts(**kwargs)
-        return cls.filter(*flts)
 
     @classmethod
     def add_(cls, data):
@@ -122,85 +94,75 @@ class MapperUtility:
         return obj
 
     @classmethod
-    def add(cls, data):
+    def add(cls, data, sync=True):
+        if hasattr(cls, '__schema__'):
+            validate(instance=data, schema=cls.__schema__)
         obj = cls.add_(data)
-        cls.commit()
-        return obj
-
-    @classmethod
-    def add_list_(cls, items):
-        for item in items:
-            cls.add_(item)
-        cls.commit()
-
-    @classmethod
-    def save_(cls, primary_key, data):
-        obj = cls.get_(primary_key)
-        if obj:
-            obj.update(data)
-        else:
-            obj = cls.add_(data)
-        cls.commit()
-        return obj
-
-    @classmethod
-    def update_(cls, primary_key, data):
-        obj = cls.get_(primary_key)
-        if obj:
-            obj.update(data)
+        if sync:
             cls.commit()
+        return obj
 
     @classmethod
-    def get_(cls, primary_key):
+    def save(cls, primary_key, data):
+        if hasattr(cls, '__schema__'):
+            validate(instance=data, schema=cls.__schema__)
+        obj = cls.get(primary_key)
+        obj.update(data)
+        cls.commit()
+
+    @classmethod
+    def get(cls, primary_key):
         return cls.query.get(primary_key)
 
     @classmethod
-    def get_json(cls, primary_key):
-        obj = cls.get_(primary_key)
-        return obj.to_json() if obj else {}
+    def delete(cls, sync=True, **kwargs):
+        cls.make_query(**kwargs).delete(synchronize_session=False)
+        if sync:
+            cls.commit()
 
     @classmethod
-    def get_list_(cls, **kwargs):
-        return cls.make_query(**kwargs).all()
+    def make_flts(cls, **kwargs):
+        return [getattr(cls, k) == v for k, v in kwargs.items() if v is not None]
+
+    @classmethod
+    def make_query(cls, **kwargs):
+        flts = cls.make_flts(**kwargs)
+        return cls.filter(*flts)
 
     @classmethod
     def get_list(cls, **kwargs):
-        items = cls.get_list_(**kwargs)
-        return cls.jsonlize(items)
+        return cls.make_query(**kwargs).all()
 
     @classmethod
-    def get_page(cls, **kwargs):
-        pagination = {
-            'page_size': kwargs.pop('page_size', 20),
-            'page_num': kwargs.pop('page_num', 1)
-        }
-        query = cls.make_query(**kwargs).order_by(cls.id.desc())
-        return cls.paginate(query, pagination)
+    def get_json(cls, primary_key):
+        obj = cls.get(primary_key)
+        return obj.to_json() if obj else {}
 
     @classmethod
-    def get_all_(cls):
-        return cls.filter().all()
+    def get_jsons(cls, page_num=None, page_size=None, order_key=None, order_way='desc', **kwargs):
+        if page_num or page_size:
+            pagination = {
+                'page_num': page_num if page_num else 1,
+                'page_size': page_size if page_size else 20
+            }
+            query = cls.make_query(**kwargs)
+            if order_key:
+                query = query.order_by(getattr(cls, order_key).desc() if order_way == 'desc' else getattr(cls, order_key).asc())
+            return cls.paginate(query, pagination)
+        else:
+            items = cls.get_list(**kwargs)
+            return cls.jsonlize(items)
 
     @classmethod
-    def get_all(cls):
-        items = cls.get_all_()
-        return cls.jsonlize(items)
-
-    @classmethod
-    def get_attrs_(cls, attr_names, **kwargs):
+    def get_attrs(cls, attr_names, **kwargs):
         flts = cls.make_flts(**kwargs)
         attrs = [getattr(cls, attr_name) for attr_name in attr_names]
-        return cls.query(*attrs).filter(*flts).all()
+        return cls.query_(*attrs).filter(*flts).all()
 
     @classmethod
-    def get_map_(cls, attr_names):
+    def get_map(cls, attr_names):
         rst_map = {}
-        for item in cls.get_attrs_(attr_names):
+        for item in cls.get_attrs(attr_names):
             a, b = item
             rst_map[a] = b
         return rst_map
-
-    @classmethod
-    def delete_list_(cls, **kwargs):
-        cls.make_query(**kwargs).delete(synchronize_session=False)
-        cls.commit()
