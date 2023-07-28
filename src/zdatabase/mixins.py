@@ -2,34 +2,43 @@ from zdatabase import db
 from jsonschema import validate
 
 
-class DatabaseUtility:
+class DatabaseMixin:
     @staticmethod
     def flush():
+        """提交会话"""
         db.session.flush()
 
     @staticmethod
     def commit():
+        """事务提交"""
         db.session.commit()
 
     @staticmethod
     def rollback():
+        """事务回滚"""
         db.session.rollback()
+    
+    @staticmethod
+    def merge(self):
+        """合并"""
+        db.session.merge(self)
+        return self
 
     @staticmethod
-    def query_(*args, **kwargs):
+    def query(*args, **kwargs):
+        """查询"""
         return db.session.query(*args, **kwargs)
 
     @staticmethod
     def add_all(items):
+        """添加多个对象到会话"""
         db.session.add_all(items)
-        db.session.commit()
-        return items
 
 
-class QueryUtility:
+class QueryMixin:
     @classmethod
     def select(cls, params, conds):
-        """ 筛选(模糊匹配）
+        """筛选(模糊匹配）
         ?name=1&asset_sn=2019-BG-5453
         """
         flts = []
@@ -40,7 +49,7 @@ class QueryUtility:
 
     @classmethod
     def select_(cls, params, conds):
-        """ 筛选(精确匹配）
+        """筛选(精确匹配）
         ?name=1&asset_sn=2019-BG-5453
         """
         flts = []
@@ -51,7 +60,7 @@ class QueryUtility:
 
     @classmethod
     def select_date(cls, attr_name, params):
-        """ 日期筛选"""
+        """日期筛选"""
         flts = []
         start_date = params.get('start_date')
         end_date = params.get('end_date')
@@ -82,7 +91,7 @@ class QueryUtility:
         return rst
 
 
-class MapperUtility:
+class MapperMixin:
     @staticmethod
     def jsonlize(items):
         return [item.to_json() for item in items]
